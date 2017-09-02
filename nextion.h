@@ -1,3 +1,6 @@
+#ifndef DK_NEXTION_H
+#define DK_NEXTION_H
+
 /*
  *  TurboKitten Nextion display handler
  *
@@ -29,14 +32,7 @@
 #include <math.h>
 #define EOC "\xff\xff\xff" // Nextion end of command
 
-#define htons(x) ( ((x)<< 8 & 0xFF00) | \
-                   ((x)>> 8 & 0x00FF) )
-#define ntohs(x) htons(x)
-#define htonl(x) ( ((x)<<24 & 0xFF000000UL) | \
-                   ((x)<< 8 & 0x00FF0000UL) | \
-                   ((x)>> 8 & 0x0000FF00UL) | \
-                   ((x)>>24 & 0x000000FFUL) )
-#define ntohl(x) htonl(x)
+#include "display_types.h"
 
 /*
  * Wrapper for an object (text, gauge, etc) on a Nextion display
@@ -60,8 +56,10 @@ class NextionObject
     uint32_t _last_update_time;
 
   public:
+  void streamIs( Stream * s ) { _stream = s; }
+  
     NextionObject(
-      Stream *stream,                  // The Stream object where the LCD is connected
+		  //      Stream *stream,                  // The Stream object where the LCD is connected
       const char *id,                  // The name of the object on the display
       const char *lid,                 // Name of the label on the display
       const char *suffix,              // Print this after the value
@@ -74,7 +72,7 @@ class NextionObject
       uint16_t refresh_ms              // Minimum time between refreshes
     )
     {
-      _stream      = stream;
+      _stream      = 0;
       _suffix      = suffix;
       _id          = id;
       _lid         = lid;
@@ -95,10 +93,10 @@ class NextionObject
     )
     {
       // Ignore update if the current value is recent enough.
-      if (millis() < _last_update_time + _refresh_ms) return;
+      //      if (millis() < _last_update_time + _refresh_ms) return;
       _last_update_time = millis();
 
-      if (_old_txt == text) return;
+      //      if (_old_txt == text) return;
       _old_txt = text;
       _stream->print(_id + ".txt=\"" + text + "\"" + EOC);
     }
@@ -184,5 +182,11 @@ class NextionObject
         txt("---");
       }
     }
+
+    void pushColor() {
+        _stream->print(_id + ".pco=" + _old_pco + EOC);
+    }
+      
 };
 
+#endif // DK_NEXTION_H
