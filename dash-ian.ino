@@ -449,10 +449,17 @@ char debugBuf[ 33 ];
 void
 readFuelPressure() {
   U16 fpAdc = analogRead( FUEL_PRESSURE_PIN );
-  float fpKpa = ((5 * (fpAdc / 1024.0)) * 172.4) - 86.1;
-  deciPsiGauge fp = fpKpa * 1.45;
-  MainDisplay.fuelPressureIs( fpKpa );
 
+  // sensor outputs from 0.5 to 4.5 out of a nominal 5, for 0-100 psi
+  // gauge.  ADC is 10 bit, so max value is 1023, but we will only
+  // read 0.5*1024 to 4.5*1024 (102.4 to 921.6).  Subtract out 102.4
+  // so that we have 0 to 819.2 for 0 - 100 psi.
+  float fpPsig = (fpAdc - 102.4) * (100 / 819.2);
+  //  float fpKpg = (fpPsig / 14.5) * 100;
+  //  float fpKpa = fpKpg + (MainDisplay.baroPressure() / 10);
+  MainDisplay.fuelPressureIs( fpPsig * 10 );
+
+#if 0
   static U32 lastDebug = 0;
 
   const U32 fpDeltaConst = 303 - ( MainDisplay.baroPressure() / 10 );
@@ -475,6 +482,7 @@ readFuelPressure() {
   } else if( oldKlc ) {
     rmDebug( 0 );
   }
+#endif
 }
 
 // all the way left     200
