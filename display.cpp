@@ -78,7 +78,8 @@ Display::printLow( bool force ) {
   maybePrintVal( displayVoltage, force );
   maybePrintVal( displayWarn, force );
   maybePrintVal( displayRunTime, force );
-  maybePrintVal( displayOilTemp, force );
+  maybePrintVal( displayOilTempPan, force );
+  maybePrintVal( displayOilTempCooler, force );
   maybePrintVal( displayFuelPressure, force );
   maybePrintVal( displayFreeRam, force );
   maybePrintVal( displayGpsSpeed, force );

@@ -20,7 +20,8 @@ enum {
   displayAfrTarget,
   displaySpark,
   displayEgt,
-  displayOilTemp,
+  displayOilTempPan,
+  displayOilTempCooler,
   displayCoolantTemp,
   displayMat,
   displayVoltage,
@@ -61,7 +62,8 @@ public:
   DISPLAY_VALUE( deciRatio, afrTarget, displayAfrTarget );
   DISPLAY_VALUE( deciDegAngle, spark, displaySpark );
   DISPLAY_VALUE( deciDegF, egt, displayEgt );
-  DISPLAY_VALUE( deciDegF, oilTemp, displayOilTemp );
+  DISPLAY_VALUE( deciDegF, oilTempPan, displayOilTempPan );
+  DISPLAY_VALUE( deciDegF, oilTempCooler, displayOilTempCooler );
   DISPLAY_VALUE( deciDegF, coolantTemp, displayCoolantTemp );
   DISPLAY_VALUE( deciDegF, mat, displayMat );
   DISPLAY_VALUE( deciVolt, voltage, displayVoltage );

@@ -35,18 +35,20 @@ NextionObject spk_g("v5", "l5", "", 10, 1, -32768, -32768, 32767,
 		    32767, 50);
 NextionObject egt_g("v6", "l6", "", 1, 0, 500, 700, 1600, 1800, 100);
   // hack, need to rework display layout for this
-NextionObject oit_g("c0", "", "oilF", 10, 0, -32768, 1700, 2400,
-		    2600, 1000);
-NextionObject clt_g("c1", "", "cltF", 10, 0, 600, 1700, 2050, 2200,
+NextionObject oitc_g("c0", "", "oFc", 10, 0, -32768, 1700, 2400,
+		     2600, 1000);
+NextionObject oitp_g("c1", "", "oFp", 10, 0, -32768, 1700, 2400,
+		     2600, 1000);
+NextionObject clt_g("c2", "", "cltF", 10, 0, 600, 1700, 2050, 2200,
 		    1010);
-NextionObject mat_g("c2", "", "matF", 10, 0, 200, 400, 1400, 1600, 200);
+NextionObject mat_g("c3", "", "matF", 10, 0, 200, 400, 1400, 1600, 200);
 NextionObject bat_g("b3", "", "v", 10, 1, 120, 130, 147, 150, 500);
 //NextionObject warn_g("warn", "", "", 0, 0, 0, 0, 0, 0, 50);
 NextionObject time_g("b0", "", "", 0, 0, 0, 0, 0, 0, 50 );
 NextionObject fp_g("b1", "", "fpP", 10, 1, 20, 30, 65, 70, 1);
-NextionObject runTime_g("c3", "", "t",  1, 0, -32768, -32768, 32767,
+NextionObject runTime_g("b2", "", "t",  1, 0, -32768, -32768, 32767,
 			32767, 50);
-NextionObject freeRam_g("b2", "", "B", 1, 0, 100, 200, 32767, 32767, 50 );
+//NextionObject freeRam_g("b2", "", "B", 1, 0, 100, 200, 32767, 32767, 50 );
 NextionObject numSat_g( "ll5", "", "sat", 1, 0, 3, 5, 100, 100, 50 );
 NextionObject altitude_g( "ll6", "", "m", 10, 1, -100, -100, 1000, 3000, 50 );
 NextionObject gpsSpeed_g( "ll7", "", "mph", 10, 1, 0, 0, 100, 120, 50 );
@@ -113,15 +115,17 @@ canTx( canAddr a, U8 extended, U8 len, void * buf ) {
 #define LED_CRIT_PIN 12
 #define LED_KIT_PIN 13
 
-#define OIL_TEMP_PIN A12
-THERMISTOR oilTempTherm( OIL_TEMP_PIN, 3075, 3820, 220 );
+#define OIL_TEMP_COOLER_PIN A12
+#define OIL_TEMP_PAN_PIN A2
+//THERMISTOR oilTempCoolerTherm( OIL_TEMP_COOLER_PIN, 3075, 3820, 220 );
+//THERMISTOR oilTempPanTherm( OIL_TEMP_PAN_PIN, 3075, 3820, 220 );
 
 #define FUEL_PRESSURE_PIN A7
 #define STEERING_ANGLE_PIN A6
 
 void readFuelPressure();
 void readSteeringAngle();
-void readOilTemp();
+void readOilTemps();
 void readTime();
 void readEgt();
 void canSendAdc( U16 canId, U8 a, U8 b, U8 c, U8 d );
@@ -165,14 +169,15 @@ setup() {
   MainDisplay.nObjIs( displayAfrTarget, &art_g );
   MainDisplay.nObjIs( displaySpark, &spk_g );
   MainDisplay.nObjIs( displayEgt, &egt_g );
-  MainDisplay.nObjIs( displayOilTemp, &oit_g );
+  MainDisplay.nObjIs( displayOilTempPan, &oitp_g );
+  MainDisplay.nObjIs( displayOilTempCooler, &oitc_g );
   MainDisplay.nObjIs( displayCoolantTemp, &clt_g );
   MainDisplay.nObjIs( displayMat, &mat_g );
   MainDisplay.nObjIs( displayVoltage, &bat_g );
   //  MainDisplay.nObjIs( displayWarn, &warn_g );
   MainDisplay.nObjIs( displayRunTime, &runTime_g );
   MainDisplay.nObjIs( displayFuelPressure, &fp_g );
-  MainDisplay.nObjIs( displayFreeRam, &freeRam_g );
+  //  MainDisplay.nObjIs( displayFreeRam, &freeRam_g );
   MainDisplay.nObjIs( displayAltitude, &altitude_g );
   MainDisplay.nObjIs( displayNumSat, &numSat_g );
   MainDisplay.nObjIs( displayGpsSpeed, &gpsSpeed_g );
@@ -215,7 +220,8 @@ setup() {
   digitalWrite( LED_KIT_PIN, HIGH );
 
   pinMode( FUEL_PRESSURE_PIN, INPUT );
-  pinMode( OIL_TEMP_PIN, INPUT );
+  pinMode( OIL_TEMP_COOLER_PIN, INPUT );
+  pinMode( OIL_TEMP_PAN_PIN, INPUT );
 
   gpsRx.debugStreamIs( &Serial );
 
@@ -268,10 +274,10 @@ loop() {
   
   if( now > nextLow ) {
     readTime();
-    readOilTemp();
+    readOilTemps();
     readEgt();
 
-    MainDisplay.freeRamIs( freeRam() );
+    //    MainDisplay.freeRamIs( freeRam() );
 
     MainDisplay.printLow( true );
     nextLow += lowInterval;
@@ -455,9 +461,17 @@ readFuelPressure() {
   // read 0.5*1024 to 4.5*1024 (102.4 to 921.6).  Subtract out 102.4
   // so that we have 0 to 819.2 for 0 - 100 psi.
   float fpPsig = (fpAdc - 102.4) * (100 / 819.2);
+  
   //  float fpKpg = (fpPsig / 14.5) * 100;
   //  float fpKpa = fpKpg + (MainDisplay.baroPressure() / 10);
   MainDisplay.fuelPressureIs( fpPsig * 10 );
+
+#if 0
+  // old broken code
+  float fpKpa = ((5 * (fpAdc / 1024.0)) * 172.4) - 86.1;
+  deciPsiGauge fp = fpKpa * 1.45;
+  MainDisplay.fuelPressureIs( fpKpa );
+#endif
 
 #if 0
   static U32 lastDebug = 0;
@@ -515,21 +529,29 @@ readEgt() {
   }
 }
 
-void
-readOilTemp() {
+deciDegF
+readOneOilTemp( int pin ) {
   U16 serialRes = 217;
   U16 nominalRes = 3075;
   float bCoeff = 3820;
-  
-  U16 otAdc = analogRead( OIL_TEMP_PIN );
+
+  U16 otAdc = analogRead( pin );
   float resistance = serialRes * ( ( 1024.0 / otAdc ) - 1 );
   float steinhart = log( resistance / nominalRes ) / bCoeff;
   steinhart += 1.0 / ( 25 + 273.15 );
   steinhart = 1 / steinhart;
   deciDegC otc = (steinhart - 273.15) * 10;
-
   deciDegF otf = (otc * 9.0 / 5) + 320;
-  MainDisplay.oilTempIs( otf );
+
+  return otf;
+}
+
+void
+readOilTemps() {
+  deciDegF otPanF = readOneOilTemp( OIL_TEMP_PAN_PIN );
+  deciDegF otCoolerF = readOneOilTemp( OIL_TEMP_COOLER_PIN );
+  MainDisplay.oilTempPanIs( otPanF );
+  MainDisplay.oilTempCoolerIs( otCoolerF );
 }
 
 void
@@ -558,7 +580,7 @@ canSendAdc( U16 canId, U8 a, U8 b, U8 c, U8 d ) {
 void
 canSendOtherData( U16 canId ) {
   U16 data[ 4 ];
-  data[ 0 ] = htons( MainDisplay.oilTemp() );
+  data[ 0 ] = htons( MainDisplay.oilTempCooler() );
   data[ 1 ] = htons( MainDisplay.fuelPressure() );
   data[ 2 ] = htons( MainDisplay.egt() );
   data[ 3 ] = htons( MainDisplay.steeringAngle() );
