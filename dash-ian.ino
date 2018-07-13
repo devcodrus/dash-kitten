@@ -27,21 +27,16 @@ HardwareSerial * nmea = &Serial2;
 NextionObject map_g("v0", "l0", "", 10, 0, 0, 0, 2600, 2800, 20);
 NextionObject afr_g("v1", "l1", "", 10, 1, 100, 105, 150, 155, 100);
 NextionObject rpm_g("v2", "l2", "", 1, 0, 0, 0, 6500, 7000, 100);
-NextionObject vss_g("v3", "l3", "", 1, 0, -32768, -32768, 32767,
-		    32767, 200);
-NextionObject art_g("v4", "l4", "", 10, 1, -32768, -32768, 32767,
-		    32767, 200);
-NextionObject spk_g("v5", "l5", "", 10, 1, -32768, -32768, 32767,
-		    32767, 50);
+NextionObject vss_g("v3", "l3", "", 1, 0, -32768, -32768, 32767, 32767, 200);
+NextionObject art_g("v4", "l4", "", 10, 1, -32768, -32768, 32767, 32767, 200);
+NextionObject spk_g("v5", "l5", "", 10, 1, -32768, -32768, 32767, 32767, 50);
 NextionObject egt_g("v6", "l6", "", 1, 0, 500, 700, 1600, 1800, 100);
   // hack, need to rework display layout for this
-NextionObject oitc_g("c0", "", "oFc", 10, 0, -32768, 1700, 2400,
-		     2600, 1000);
-NextionObject oitp_g("c1", "", "oFp", 10, 0, -32768, 1700, 2400,
-		     2600, 1000);
-NextionObject clt_g("c2", "", "cltF", 10, 0, 600, 1700, 2050, 2200,
-		    1010);
-NextionObject mat_g("c3", "", "matF", 10, 0, 200, 400, 1400, 1600, 200);
+NextionObject oitc_g("c0", "", "oFc", 10, 0, -32768, 1700, 2400, 2600, 1000);
+NextionObject oitp_g("c1", "", "oFp", 10, 0, -32768, 1700, 2400, 2600, 1000);
+NextionObject clt_g("c2", "", "cltF", 10, 0, 600, 1700, 2050, 2200, 1010);
+//NextionObject mat_g("c3", "", "matF", 10, 0, 200, 400, 1400, 1600, 200);
+NextionObject cltaux_g("c3", "", "auxF", 10, 0, 600, 1700, 2050, 2200, 1010);
 NextionObject bat_g("b3", "", "v", 10, 1, 120, 130, 147, 150, 500);
 //NextionObject warn_g("warn", "", "", 0, 0, 0, 0, 0, 0, 50);
 NextionObject time_g("b0", "", "", 0, 0, 0, 0, 0, 0, 50 );
@@ -115,8 +110,15 @@ canTx( canAddr a, U8 extended, U8 len, void * buf ) {
 #define LED_CRIT_PIN 12
 #define LED_KIT_PIN 13
 
-#define OIL_TEMP_COOLER_PIN A12
-#define OIL_TEMP_PAN_PIN A2
+#define OIL_TEMP_PAN_PIN A12
+#define OIL_TEMP_COOLER_PIN A11
+#define COOLANT_TEMP_AUX_PIN A10
+
+// measured resistances from the nominal 220 ohm resistors on the board
+#define OIL_TEMP_PAN_RESIST 217
+#define OIL_TEMP_COOLER_RESIST 216
+#define COOLANT_TEMP_AUX_RESIST 219
+
 //THERMISTOR oilTempCoolerTherm( OIL_TEMP_COOLER_PIN, 3075, 3820, 220 );
 //THERMISTOR oilTempPanTherm( OIL_TEMP_PAN_PIN, 3075, 3820, 220 );
 
@@ -125,7 +127,7 @@ canTx( canAddr a, U8 extended, U8 len, void * buf ) {
 
 void readFuelPressure();
 void readSteeringAngle();
-void readOilTemps();
+void readFluidTemps();
 void readTime();
 void readEgt();
 void canSendAdc( U16 canId, U8 a, U8 b, U8 c, U8 d );
@@ -134,6 +136,7 @@ void canSendOtherData( U16 canId );
 #define ADC_PAGE_1_ID 0x20            // Destination CAN ID for Page 1
 #define ADC_PAGE_2_ID 0x21            // and page 2
 #define ADC_PAGE_3_ID 0x30            // and page 3
+#define ADC_PAGE_4_ID 0x31            // and page4
 
 void maybeUpdateLeds();
 bool kittenLedConfig = false;
@@ -146,6 +149,7 @@ bool warnLedStatus = false;
 void handleNmea();
 void handleRltc();
 void refreshGps();
+void validateCoolantTemp();
 void displayField( String * lcd, String id, String text );
 
 GpsRx gpsRx;
@@ -172,7 +176,8 @@ setup() {
   MainDisplay.nObjIs( displayOilTempPan, &oitp_g );
   MainDisplay.nObjIs( displayOilTempCooler, &oitc_g );
   MainDisplay.nObjIs( displayCoolantTemp, &clt_g );
-  MainDisplay.nObjIs( displayMat, &mat_g );
+  MainDisplay.nObjIs( displayCoolantAuxTemp, &cltaux_g );
+  //MainDisplay.nObjIs( displayMat, &mat_g );
   MainDisplay.nObjIs( displayVoltage, &bat_g );
   //  MainDisplay.nObjIs( displayWarn, &warn_g );
   MainDisplay.nObjIs( displayRunTime, &runTime_g );
@@ -222,6 +227,7 @@ setup() {
   pinMode( FUEL_PRESSURE_PIN, INPUT );
   pinMode( OIL_TEMP_COOLER_PIN, INPUT );
   pinMode( OIL_TEMP_PAN_PIN, INPUT );
+  pinMode( COOLANT_TEMP_AUX_PIN, INPUT );
 
   gpsRx.debugStreamIs( &Serial );
 
@@ -264,6 +270,7 @@ loop() {
     readFuelPressure();
     readSteeringAngle();
     canSendOtherData( ADC_PAGE_3_ID );
+    canSendOtherData( ADC_PAGE_4_ID );
     nextHi += highInterval;
   }
   
@@ -274,7 +281,7 @@ loop() {
   
   if( now > nextLow ) {
     readTime();
-    readOilTemps();
+    readFluidTemps();
     readEgt();
 
     //    MainDisplay.freeRamIs( freeRam() );
@@ -284,6 +291,8 @@ loop() {
     MainDisplay.refresh_labels();
 
     refreshGps();
+
+    validateCoolantTemp();
   }
 
   if( now > nextColor ) {
@@ -530,8 +539,7 @@ readEgt() {
 }
 
 deciDegF
-readOneOilTemp( int pin ) {
-  U16 serialRes = 217;
+readOneWestachThermistor( int pin, U16 serialRes ) {
   U16 nominalRes = 3075;
   float bCoeff = 3820;
 
@@ -547,11 +555,16 @@ readOneOilTemp( int pin ) {
 }
 
 void
-readOilTemps() {
-  deciDegF otPanF = readOneOilTemp( OIL_TEMP_PAN_PIN );
-  deciDegF otCoolerF = readOneOilTemp( OIL_TEMP_COOLER_PIN );
+readFluidTemps() {
+  deciDegF otPanF = readOneWestachThermistor( OIL_TEMP_PAN_PIN,
+					      OIL_TEMP_PAN_RESIST );
+  deciDegF otCoolerF = readOneWestachThermistor( OIL_TEMP_COOLER_PIN,
+						 OIL_TEMP_COOLER_RESIST );
+  deciDegF clAuxF = readOneWestachThermistor( COOLANT_TEMP_AUX_PIN,
+					      COOLANT_TEMP_AUX_RESIST );
   MainDisplay.oilTempPanIs( otPanF );
   MainDisplay.oilTempCoolerIs( otCoolerF );
+  MainDisplay.coolantAuxTempIs( clAuxF );
 }
 
 void
@@ -580,10 +593,17 @@ canSendAdc( U16 canId, U8 a, U8 b, U8 c, U8 d ) {
 void
 canSendOtherData( U16 canId ) {
   U16 data[ 4 ];
-  data[ 0 ] = htons( MainDisplay.oilTempCooler() );
-  data[ 1 ] = htons( MainDisplay.fuelPressure() );
-  data[ 2 ] = htons( MainDisplay.egt() );
-  data[ 3 ] = htons( MainDisplay.steeringAngle() );
+  if( canId == ADC_PAGE_3_ID ) {
+    data[ 0 ] = htons( MainDisplay.oilTempPan() );
+    data[ 1 ] = htons( MainDisplay.fuelPressure() );
+    data[ 2 ] = htons( MainDisplay.egt() );
+    data[ 3 ] = htons( MainDisplay.steeringAngle() );
+  } else if( canId == ADC_PAGE_4_ID ) {
+    data[ 0 ] = htons( MainDisplay.oilTempCooler() );
+    data[ 1 ] = htons( MainDisplay.coolantAuxTemp() );
+    data[ 2 ] = 0;
+    data[ 3 ] = 0;
+  }
   CAN0.sendMsgBuf( canId, 0, 8, (U8 *) &data );
 }
 
@@ -599,6 +619,15 @@ void
 maybeUpdateLeds() {
   U32 afrError = abs( (MainDisplay.afr() - MainDisplay.afrTarget()) );
   //  critLedConfig = (MainDisplay.rpm() > 1500) && (afrError > 10);
+  bool oldClc = critLedConfig;
+  critLedConfig = MainDisplay.coolantTempDiff() > 50;
+  if( critLedConfig != oldClc ) {
+    if( critLedConfig ) {
+      addDebug( 2, "coolant temp delta" );
+    } else {
+      rmDebug( 2 );
+    }
+  }
 
   bool oldWlc = warnLedConfig;
   warnLedConfig = (MainDisplay.knockRetard() != 0);
@@ -673,6 +702,15 @@ refreshGps() {
   long_g.label( "LONG" );
   fix_g.txt( gpsRx.fixTypeString() );
   fix_g.label( "FIX" );
+}
+
+void
+validateCoolantTemp() {
+  S32 coolantDiff = MainDisplay.coolantTemp() - MainDisplay.coolantAuxTemp();
+  if( coolantDiff < 0 ) {
+    coolantDiff *= -1;
+  }
+  MainDisplay.coolantTempDiffIs( coolantDiff );
 }
 
 #if 0

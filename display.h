@@ -23,6 +23,8 @@ enum {
   displayOilTempPan,
   displayOilTempCooler,
   displayCoolantTemp,
+  displayCoolantAuxTemp,
+  displayCoolantTempDiff,
   displayMat,
   displayVoltage,
   displayWarn,
@@ -65,6 +67,8 @@ public:
   DISPLAY_VALUE( deciDegF, oilTempPan, displayOilTempPan );
   DISPLAY_VALUE( deciDegF, oilTempCooler, displayOilTempCooler );
   DISPLAY_VALUE( deciDegF, coolantTemp, displayCoolantTemp );
+  DISPLAY_VALUE( deciDegF, coolantAuxTemp, displayCoolantAuxTemp );
+  DISPLAY_VALUE( deciDegF, coolantTempDiff, displayCoolantTempDiff );
   DISPLAY_VALUE( deciDegF, mat, displayMat );
   DISPLAY_VALUE( deciVolt, voltage, displayVoltage );
   DISPLAY_VALUE( bool, warn, displayWarn );

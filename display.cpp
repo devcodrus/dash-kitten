@@ -74,6 +74,8 @@ void
 Display::printLow( bool force ) {
   maybePrintVal( displayEgt, force );
   maybePrintVal( displayCoolantTemp, force );
+  maybePrintVal( displayCoolantAuxTemp, force );
+  maybePrintVal( displayCoolantTempDiff, force );
   maybePrintVal( displayMat, force );
   maybePrintVal( displayVoltage, force );
   maybePrintVal( displayWarn, force );
